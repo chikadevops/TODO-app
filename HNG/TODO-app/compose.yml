@@ -1,0 +1,120 @@
+services:
+  frontend:
+    # image: frontend
+    build: ./frontend
+    container_name: frontend-cont
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: "development"
+      PORT: ${PORT}
+      AUTH_API_ADDRESS: ${AUTH_API_ADDRESS}
+      TODOS_API_ADDRESS: ${TODOS_API_ADDRESS}
+    depends_on:
+      - auth-api
+      - todos-api
+    networks:
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`apptodo.duckdns.org`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
+
+  auth-api:
+    # image: auth-api
+    build: ./auth-api
+    container_name: auth-api-cont
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      AUTH_API_PORT: ${AUTH_API_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      USERS_API_ADDRESS: ${USERS_API_ADDRESS}
+    depends_on:
+      - users-api
+    networks:
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`apptodo.duckdns.org`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth.entrypoints=websecure"
+      - "traefik.http.routers.auth.tls.certresolver=letsencrypt"
+      - "traefik.http.services.auth.loadbalancer.server.port=8081"
+
+  todos-api:
+    # image: todos-api
+    build: ./todos-api
+    container_name: todos-api-cont
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_CHANNEL: ${REDIS_CHANNEL}
+    depends_on:
+      - redis-queue
+    networks:
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.todos.rule=Host(`apptodo.duckdns.org`) && PathPrefix(`/api/todos`)"
+      - "traefik.http.routers.todos.entrypoints=websecure"
+      - "traefik.http.routers.todos.tls.certresolver=letsencrypt"
+      - "traefik.http.services.todos.loadbalancer.server.port=8082"
+
+  users-api:
+    # image: users-api
+    build: ./users-api
+    container_name: users-api-cont
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: ${SERVER_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.users.rule=Host(`apptodo.duckdns.org`) && PathPrefix(`/api/users`)"
+      - "traefik.http.routers.users.entrypoints=websecure"
+      - "traefik.http.routers.users.tls.certresolver=letsencrypt"
+      - "traefik.http.services.users.loadbalancer.server.port=8083"
+
+  log-message-processor:
+    # image: log-message-processor
+    build: ./log-message-processor
+    container_name: log-message-processor-cont
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_CHANNEL: ${REDIS_CHANNEL}
+    depends_on:
+      - redis-queue
+    networks:
+      - app-network
+
+  redis-queue:
+    image: redis:latest
+    container_name: redis-queue-cont
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+
+
+
